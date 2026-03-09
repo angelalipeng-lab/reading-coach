@@ -1,1 +1,580 @@
-loading
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Reading Coach (G2) — Read & Repeat</title>
+<style>
+:root{
+--bg:#0b1220; --card:#121a2b; --muted:#9fb0d0; --text:#eaf0ff; --accent:#66e3ff;
+--good:#41d17d; --bad:#ff6b6b; --warn:#ffcc66;
+}
+body{margin:0; font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial; background:linear-gradient(180deg,#070b14, #0b1220); color:var(--text);}
+.wrap{max-width:980px; margin:0 auto; padding:18px;}
+.h1{font-size:20px; font-weight:800; letter-spacing:.2px;}
+.sub{color:var(--muted); margin-top:6px; line-height:1.4;}
+.grid{display:grid; grid-template-columns: 1.2fr .8fr; gap:14px; margin-top:14px;}
+@media (max-width: 860px){ .grid{grid-template-columns:1fr; } }
+.card{background:rgba(18,26,43,.92); border:1px solid rgba(102,227,255,.14); border-radius:14px; padding:14px; box-shadow: 0 10px 30px rgba(0,0,0,.25);}
+.row{display:flex; gap:10px; flex-wrap:wrap; align-items:center;}
+select, button, input, textarea{
+background:#0e1628; color:var(--text); border:1px solid rgba(159,176,208,.25);
+border-radius:12px; padding:10px 12px; font-size:14px;
+}
+textarea{width:100%; min-height:90px; resize:vertical; line-height:1.45;}
+button{cursor:pointer; font-weight:700;}
+button.primary{border-color: rgba(102,227,255,.5); background: linear-gradient(180deg, rgba(102,227,255,.20), rgba(102,227,255,.06));}
+button.good{border-color: rgba(65,209,125,.55); background: linear-gradient(180deg, rgba(65,209,125,.18), rgba(65,209,125,.06));}
+button.bad{border-color: rgba(255,107,107,.55); background: linear-gradient(180deg, rgba(255,107,107,.18), rgba(255,107,107,.06));}
+.pill{display:inline-flex; padding:6px 10px; border-radius:999px; border:1px solid rgba(159,176,208,.25); color:var(--muted); font-size:12px;}
+.big{font-size:18px; font-weight:800;}
+.sentBox{margin-top:12px; padding:12px; border-radius:14px; border:1px dashed rgba(159,176,208,.25); background: rgba(14,22,40,.6);}
+.words{display:flex; flex-wrap:wrap; gap:6px; line-height:2;}
+.w{padding:4px 6px; border-radius:8px; border:1px solid rgba(159,176,208,.18); background: rgba(12,18,34,.55);}
+.w.cur{border-color: rgba(102,227,255,.7); box-shadow: 0 0 0 3px rgba(102,227,255,.15);}
+.w.miss{border-color: rgba(255,107,107,.7); background: rgba(255,107,107,.10);}
+.w.sub{border-color: rgba(255,204,102,.7); background: rgba(255,204,102,.10);}
+.w.ok{border-color: rgba(65,209,125,.65); background: rgba(65,209,125,.08);}
+.muted{color:var(--muted);}
+.hr{height:1px; background: rgba(159,176,208,.16); margin:12px 0;}
+.kpi{display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; margin-top:10px;}
+@media (max-width: 560px){ .kpi{grid-template-columns: 1fr; } }
+.k{padding:10px; border-radius:14px; border:1px solid rgba(159,176,208,.18); background: rgba(14,22,40,.55);}
+.k .t{color:var(--muted); font-size:12px;}
+.k .v{font-size:18px; font-weight:900; margin-top:6px;}
+.log{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono"; font-size:12px; white-space:pre-wrap; color:#d4ddff;}
+.small{font-size:12px;}
+a{color:var(--accent);}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="h1">Reading Coach (Grade 2) — Read • Repeat • Improve</div>
+<div class="sub">
+Themes: <span class="pill">Star Wars</span> <span class="pill">History & Geography</span> <span class="pill">Science</span><br/>
+Mode: <b>Listen</b> (TTS) → <b>Read aloud</b> → <b>Check</b> (speech-to-text) → <b>Repeat</b><br/>
+Tip for skipping words: follow the <b>highlighted</b> words and read in short phrases.
+</div>
+<div class="grid">
+<div class="card">
+<div class="row">
+<span class="pill" id="devicePill">Device: detecting…</span>
+<span class="pill" id="sttPill">Speech-to-text: checking…</span>
+<span class="pill" id="ttsPill">TTS: checking…</span>
+</div>
+
+<div class="hr"></div>
+
+<div class="row">
+<label class="pill">Text</label>
+<select id="storySelect"></select>
+<button class="primary" id="loadBtn">Load</button>
+<button id="nextBtn">Next sentence</button>
+</div>
+
+<div class="sentBox">
+<div class="row" style="justify-content:space-between;">
+<div class="big" id="title">—</div>
+<div class="pill">Sentence <span id="sentIdx">0</span>/<span id="sentTotal">0</span></div>
+</div>
+<div class="muted small" id="cue" style="margin-top:6px;">Cue: —</div>
+<div class="words" id="words" style="margin-top:10px;"></div>
+</div>
+
+<div class="hr"></div>
+
+<div class="row">
+<button class="good" id="listenBtn">Listen (TTS)</button>
+<button class="primary" id="startRecBtn">Start speaking</button>
+<button class="bad" id="stopRecBtn" disabled>Stop</button>
+<button id="checkBtn" disabled>Check</button>
+</div>
+<div class="muted small" style="margin-top:8px;">
+iOS: if “Start speaking” does nothing, open Safari → refresh → allow microphone. Some networks block speech recognition.
+</div>
+
+<div class="hr"></div>
+
+<div class="row">
+<label class="pill">Child said (transcript)</label>
+</div>
+<textarea id="transcript" placeholder="Transcript will appear here…"></textarea>
+
+<div class="row" style="margin-top:10px;">
+<button id="saveSessionBtn">Save progress</button>
+<button id="reportBtn">Generate parent report</button>
+<button id="resetBtn" class="bad">Reset all</button>
+</div>
+</div>
+
+<div class="card">
+<div class="big">Today</div>
+<div class="kpi">
+<div class="k"><div class="t">Sentences practiced</div><div class="v" id="kSent">0</div></div>
+<div class="k"><div class="t">Words missed</div><div class="v" id="kMiss">0</div></div>
+<div class="k"><div class="t">Top repeated error</div><div class="v" id="kTop">—</div></div>
+</div>
+
+<div class="hr"></div>
+<div class="big">Error notebook</div>
+<div class="muted small">Focus on: skipped words, -s / -ed endings, and “look-alike” words.</div>
+<div class="hr"></div>
+<div class="log" id="log"></div>
+
+<div class="hr"></div>
+<div class="muted small">
+Privacy: all data stays in your browser (localStorage). No uploads.
+</div>
+</div>
+</div>
+</div>
+
+<script>
+(function(){
+// ---- Content (Grade 2, short sentences, high-frequency words) ----
+const stories = [
+{
+id:"sw1",
+theme:"Star Wars",
+title:"A Small Droid, A Big Job",
+text:A small droid rolls into the ship. It has a message for a brave friend. The ship is dark and very quiet. The droid finds a map on a screen. The map shows a safe path in space. A pilot reads the map very slowly. He points to each word on the screen. He does not rush. He checks every line. Now the ship can fly the safe way.
+},
+{
+id:"sw2",
+theme:"Star Wars",
+title:"The Light in the Cave",
+text:The team walks into a cave. The cave is cold and wet. A small light turns on. They see marks on the wall. The marks look like lines on a map. They read one line at a time. They stop when a word is hard. They read it again. They do not skip it. Then they find the exit.
+},
+{
+id:"sw3",
+theme:"Star Wars",
+title:"Practice Like a Jedi",
+text:A young learner trains each day. He reads a short page out loud. He uses his finger to track the words. If he misses a word, he goes back. He reads the same line three times. Each time, it gets smoother. He smiles and keeps going. Small practice makes big skill.
+},
+{
+id:"hg1",
+theme:"History & Geography",
+title:"A Map of Our Town",
+text:We look at a map of our town. A map is a picture of a place. It shows roads and rivers. We find the school on the map. We find the park near the school. We read the street names slowly. We do not jump to the next line. We say each word. Now we can plan a walk.
+},
+{
+id:"hg2",
+theme:"History & Geography",
+title:"Long Ago, People Traveled",
+text:Long ago, people traveled far. Some walked on long roads. Some rode horses. Some sailed on ships. They used stars to find directions. They watched the sun in the day. They read signs on the road. They checked the words twice. That helped them stay on track.
+},
+{
+id:"hg3",
+theme:"History & Geography",
+title:"Mountains and Valleys",
+text:A mountain is very high land. A valley is low land between hills. Some valleys have rivers. Rivers move from high to low. We read these science words slowly. We clap the parts: moun-tain, val-ley. We point to each word. We do not skip the small words. Small words matter for meaning.
+},
+{
+id:"sci1",
+theme:"Science",
+title:"The Water Cycle",
+text:Water can change form. The sun warms water in a lake. Some water goes up as vapor. This is called evaporation. Clouds form in the sky. Then rain falls to the ground. We read the long word slowly. E-vap-o-ra-tion. We read it again to be sure.
+},
+{
+id:"sci2",
+theme:"Science",
+title:"A Magnet Test",
+text:A magnet can pull some things. It can pull a paper clip. It cannot pull a plastic spoon. We test one item at a time. We write the result in a list. We read the list out loud. We point to each line. We do not skip any row.
+},
+{
+id:"sci3",
+theme:"Science",
+title:"Planets in Order",
+text:Planets go around the sun. Earth is one planet. Mars is another planet. Jupiter is very big. We learn the names in order. We read the names slowly. We say each sound. We do not drop the last sound. Then we remember them better.
+}
+];
+
+// ---- Helpers ----
+const $ = (id)=>document.getElementById(id);
+const normWord = (w)=> (w||"")
+.toLowerCase()
+.replace(/[^a-z']/g,'')
+.replace(/^'+|'+$/g,'');
+
+const splitSentences = (text)=> text
+.split(/\n+/)
+.map(s=>s.trim())
+.filter(Boolean);
+
+const phraseCue = (sentence)=>{
+// very simple phrase cue: break at commas/and/but/so/then
+const tokens = sentence.split(/\s+/);
+const breaks = new Set(["and","but","so","then","when","if","because"]);
+let out = [];
+let buf = [];
+for (const t of tokens){
+buf.push(t);
+if (breaks.has(normWord(t)) || t.endsWith(",") || t.endsWith(";")){
+out.push(buf.join(" "));
+buf = [];
+}
+}
+if (buf.length) out.push(buf.join(" "));
+return out.join(" | ");
+};
+
+function lcsAlign(ref, hyp){
+// Dynamic programming LCS on words (small sizes)
+const n=ref.length, m=hyp.length;
+const dp = Array.from({length:n+1}, ()=>Array(m+1).fill(0));
+for(let i=1;i<=n;i+
++){
+for(let j=1;j<=m;j++){
+dp[i][j] = (ref[i-1]===hyp[j-1]) ? dp[i-1][j-1]+1 : Math.max(dp[i-1][j], dp[i][j-1]);
+}
+}
+// backtrack to mark matches
+let i=n, j=m;
+const match = new Array(n).fill(false);
+const usedHyp = new Array(m).fill(false);
+while(i>0 && j>0){
+if(ref[i-1]===hyp[j-1]){
+match[i-1]=true; usedHyp[j-1]=true;
+i--; j--;
+} else if (dp[i-1][j] >= dp[i][j-1]) i--;
+else j--;
+}
+return {match, usedHyp};
+}
+
+// ---- State ----
+const state = {
+storyId: stories[0].id,
+sents: [],
+idx: 0,
+lastTranscript: "",
+notebook: loadNotebook(),
+today: loadToday()
+};
+
+// ---- Speech (TTS + STT) ----
+const device = /iPad|iPhone|iPod/.test(navigator.userAgent) ? "iOS" : "Other";
+$("devicePill").textContent = "Device: " + device;
+
+const canTTS = 'speechSynthesis' in window;
+$("ttsPill").textContent = "TTS: " + (canTTS ? "available" : "not available");
+
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+const canSTT = !!SpeechRecognition;
+$("sttPill").textContent = "Speech-to-text: " + (canSTT ? "available" : "not available");
+if(!canSTT){
+$("startRecBtn").disabled = true;
+$("stopRecBtn").disabled = true;
+$("checkBtn").disabled = false; // allow manual paste
+$("transcript").placeholder = "Speech-to-text not available here. Type or paste what the child said, then press Check.";
+}
+
+let rec = null;
+let recActive = false;
+
+function speak(sentence){
+if(!canTTS) return;
+speechSynthesis.cancel();
+const u = new SpeechSynthesisUtterance(sentence);
+u.lang = "en-US";
+u.rate = 0.95;
+u.pitch = 1.0;
+speechSynthesis.speak(u);
+highlightFollow(sentence);
+}
+
+function startRec(){
+if(!canSTT) return;
+rec = new SpeechRecognition();
+rec.lang = "en-US";
+rec.continuous = true;
+rec.interimResults = true;
+recActive = true;
+let finalText = "";
+$("transcript").value = "";
+$("checkBtn").disabled = true;
+$("stopRecBtn").disabled = false;
+$("startRecBtn").disabled = true;
+
+rec.onresult = (e)=>{
+let interim = "";
+for(let i=e.resultIndex; i<e.results.length; i++){
+const t = e.results[i][0].transcript;
+if(e.results[i].isFinal) finalText += t + " ";
+else interim += t;
+}
+$("transcript").value = (finalText + interim).trim();
+};
+rec.onerror = (e)=>{
+log("STT error: " + (e.error || "unknown"));
+};
+rec.onend = ()=>{
+recActive = false;
+$("stopRecBtn").disabled = true;
+$("startRecBtn").disabled = false;
+$("checkBtn").disabled = false;
+};
+try{ rec.start(); }
+catch(err){
+log("STT start failed. Try refresh and allow microphone.");
+$("stopRecBtn").disabled = true;
+$("startRecBtn").disabled = false;
+$("checkBtn").disabled = false;
+}
+}
+
+function stopRec(){
+if(rec && recActive){
+try{ rec.stop(); }catch(e){}
+}
+}
+
+// ---- UI render ----
+function fillSelect(){
+$("storySelect").innerHTML = "";
+for(const s of stories){
+const opt = document.createElement("option");
+opt.value = s.id;
+opt.textContent = [${s.theme}] ${s.title};
+$("storySelect").appendChild(opt);
+}
+$("storySelect").value = state.storyId;
+}
+
+function loadStory(id){
+const st = stories.find(x=>x.id===id) || stories[0];
+state.storyId = st.id;
+state.sents = splitSentences(st.text);
+state.idx = 0;
+$("title").textContent = st.title;
+$("sentTotal").textContent = String(state.sents.length);
+renderSentence();
+saveProgress();
+}
+
+function currentSentence(){
+return state.sents[state.idx] || "";
+}
+
+function renderSentence(markup){
+const sentence = currentSentence();
+$("sentIdx").textContent = String(state.idx+1);
+$("cue").textContent = "Cue: " + phraseCue(sentence);
+
+const words = sentence.split(/\s+/).filter(Boolean);
+$("words").innerHTML = "";
+words.forEach((w, i)=>{
+const span = document.createElement("span");
+span.className = "w";
+span.textContent = w;
+span.dataset.i = i;
+$("words").appendChild(span);
+});
+
+if(markup){
+applyMarkup(markup);
+}
+}
+
+function applyMarkup(mark){
+// mark: array of {i, cls}
+const nodes = $("words").querySelectorAll(".w");
+nodes.forEach(n=>{
+n.classList.remove("cur","miss","sub","ok");
+});
+for(const it of mark){
+const n = $("words").querySelector(.w[data-i="${it.i}"]);
+if(n) n.classList.add(it.cls);
+}
+}
+
+// crude "follow highlight" during TTS by time slicing
+function highlightFollow(sentence){
+const words = sentence.split(/\s+/).filter(Boolean);
+let i=0;
+const base = Math.max(220, Math.min(420, 2600 / Math.max(6, words.length)));
+const timer = setInterval(()=>{
+const nodes = $("words").querySelectorAll(".w");
+nodes.forEach(n=>n.classList.remove("cur"));
+const node = $("words").querySelector(.w[data-i="${i}"]);
+if(node) node.classList.add("cur");
+i++;
+if(i>=words.length) { clearInterval(timer); setTimeout(()=>nodes.forEach(n=>n.classList.remove("cur")), 250); }
+}, base);
+}
+
+function check(){
+const refRaw = currentSentence();
+const hypRaw = $("transcript").value || "";
+state.lastTranscript = hypRaw;
+
+const ref = refRaw.split(/\s+/).map(normWord).filter(Boolean);
+const hyp = hypRaw.split(/\s+/).map(normWord).filter(Boolean);
+
+const {match} = lcsAlign(ref, hyp);
+
+// mark misses
+const mark = [];
+let misses = 0;
+ref.forEach((w, i)=>{
+if(match[i]) mark.push({i, cls:"ok"});
+else { mark.push({i, cls:"miss"}); misses++; addError(w); }
+});
+applyMarkup(mark);
+
+// update today stats
+state.today.sentences += 1;
+state.today.missed += misses;
+saveToday();
+updateKPI();
+
+log(REF: ${refRaw}\nHYP: ${hypRaw}\nMissed words: ${misses}\n---);
+
+// suggest repeat
+if(misses > 0){
+log("Coach: Read the same sentence again. Follow the highlighted words.\n");
+} else {
+log("Coach: Great. Next sentence.\n");
+}
+}
+
+// ---- Notebook / Adaptive ----
+function addError(word){
+if(!word) return;
+const k = word;
+state.notebook[k] = (state.notebook[k] || 0) + 1;
+saveNotebook();
+renderNotebook();
+}
+
+function topError(){
+let best = null, bestV = 0;
+for(const [k,v] of Object.entries(state.notebook)){
+if(v>bestV){ best=k; bestV=v; }
+}
+return best ? ${best} (${bestV}) : "—";
+}
+
+function renderNotebook(){
+const items = Object.entries(state.notebook)
+.sort((a,b)=>b[1]-a[1])
+.slice(0, 24);
+if(items.length===0){
+$("log").textContent = "No errors yet. Start a sentence and press Check.\n";
+return;
+}
+const lines = items.map(([w,c])=> ${w.padEnd(14,' ')} x${c});
+$("log").textContent = "Top errors (most missed words):\n" + lines.join("\n") + "\n";
+}
+
+// ---- Storage ----
+function loadNotebook(){
+try{ return JSON.parse(localStorage.getItem("rc_notebook")||"{}"); }catch(e){ return {}; }
+}
+function saveNotebook(){
+localStorage.setItem("rc_notebook", JSON.stringify(state.notebook));
+}
+function loadToday(){
+const key = "rc_today_" + new Date().toISOString().slice(0,10);
+try{ return JSON.parse(localStorage.getItem(key)||'{"sentences":0,"missed":0}'); }catch(e){ return {sentences:0, missed:0}; }
+}
+function saveToday(){
+const key = "rc_today_" + new Date().toISOString().slice(0,10);
+localStorage.setItem(key, JSON.stringify(state.today));
+}
+function saveProgress(){
+localStorage.setItem("rc_progress", JSON.stringify({storyId:state.storyId, idx:state.idx}));
+}
+function loadProgress(){
+try{ return JSON.parse(localStorage.getItem("rc_progress")||"{}"); }catch(e){ return {}; }
+}
+
+// ---- Report ----
+function generateReport(){
+const date = new Date().toISOString().slice(0,10);
+const st = stories.find(x=>x.id===state.storyId);
+const top = topError();
+const report =
+`Reading Coach — Parent Report (${date})
+Site: ${location.href}
+
+Today:
+Sentences practiced: ${state.today.sentences}
+Words missed (total): ${state.today.missed}
+Top repeated missed word: ${top}
+What to do next (5–8 minutes):
+Pick one short sentence.
+Listen once (TTS).
+Read aloud 3 times (slow, accurate).
+Point to each word (no skipping).
+Themes used: Star Wars / History & Geography / Science
+Current text: ${(st && st.title) ? st.title : "—"}
+`;
+alert(report);
+try{
+navigator.clipboard.writeText(report);
+log("Parent report copied to clipboard.\n");
+}catch(e){
+log("Parent report shown (copy manually if needed).\n");
+}
+}
+
+function resetAll(){
+if(!confirm("Reset all saved data on this device?")) return;
+localStorage.clear();
+state.notebook = {};
+state.today = {sentences:0, missed:0};
+saveToday(); saveNotebook();
+renderNotebook(); updateKPI();
+$("transcript").value = "";
+log("Reset done.\n");
+}
+
+// ---- Logging / KPI ----
+function log(msg){
+const prev = $("log").textContent || "";
+$("log").textContent = prev + msg + "\n";
+}
+function updateKPI(){
+$("kSent").textContent = String(state.today.sentences);
+$("kMiss").textContent = String(state.today.missed);
+$("kTop").textContent = topError();
+}
+
+// ---- Events ----
+$("loadBtn").onclick = ()=> loadStory($("storySelect").value);
+$("nextBtn").onclick = ()=>{
+state.idx = Math.min(state.idx+1, state.sents.length-1);
+renderSentence();
+saveProgress();
+};
+$("listenBtn").onclick = ()=> speak(currentSentence());
+$("startRecBtn").onclick = ()=> startRec();
+$("stopRecBtn").onclick = ()=> stopRec();
+$("checkBtn").onclick = ()=> check();
+$("saveSessionBtn").onclick = ()=> { saveProgress(); saveToday(); saveNotebook(); alert("Saved on this device."); };
+$("reportBtn").onclick = ()=> generateReport();
+$("resetBtn").onclick = ()=> resetAll();
+$("storySelect").onchange = ()=> {
+// don't auto load; keep explicit load
+};
+
+// ---- Init ----
+fillSelect();
+const pr = loadProgress();
+if(pr.storyId) state.storyId = pr.storyId;
+loadStory(state.storyId);
+if(Number.isInteger(pr.idx) && pr.idx>=0){
+state.idx = Math.min(pr.idx, state.sents.length-1);
+renderSentence();
+}
+updateKPI();
+renderNotebook();
+
+// UX: enable manual check if STT unavailable
+if(!canSTT) $("checkBtn").disabled = false;
+
+})();
+</script>
+</body>
+</html>
